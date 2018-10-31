@@ -76,6 +76,7 @@ int criar_raiz (char chave, int esquerda, int direita);
 int inserir (int rrn, char chave, int *promo_r_filho, char *promo_chave);
 BTpagina ler_arquivo (int rrn, BTpagina *ponteiro_pag); 
 
+/*menu principal*/
 int main(){ 
 	int promovido;		/* boolean: tells if a promotion from below */
     int raiz,i=0,   	/* rrn of raiz page */
