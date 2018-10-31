@@ -30,21 +30,22 @@ struct livro{
   char ano[5];
 }arq_livros[TAM_STRUCT];
 
-/* arquivo de busca.bin */
+/* arquivo de busca_arq.bin */
 struct busca_arquivo{
 	char isbn[14];
-}busca[TAM_STRUCT];
+}arq_busca[TAM_STRUCT];
 
 /* arquivo de busca casada.bin*/
 struct busca_casada{
 	char isbn1[14];
 	char isbn2[14];
-}consulta_casada[TAM_STRUCT];
+}arq_consulta_casada[TAM_STRUCT];
 
 /* arquivo remove.bin */
 struct busca_remove{
 	char isbn[14];
-}remove[TAM_STRUCT];
+}arq_remove[TAM_STRUCT];
+
 
 #define TAMPAG sizeof(BTpagina) 
 
@@ -68,7 +69,8 @@ void fechar_arquivo (FILE **p_arq);
 int abrir_arquivo (char nome_arq[], char tipo_abertura[]); 
 int pegar_raiz (); 
 int pegar_pagina ();
-int criar_arvore();
+int criar_arvore(char chave);
+int carregar_arquivo(int resp);
 int procurar_no (char chave, BTpagina *p_pag, int *pos);
 int criar_raiz (char chave, int esquerda, int direita);
 int inserir (int rrn, char chave, int *promo_r_filho, char *promo_chave);
@@ -84,7 +86,7 @@ int main(){
     printf("\n hello there\n");     
     
 	int resp, sair = 0, tam_vet_inserir = 0;
-	char arq_livros[]="livros.bin";
+	char arq_livros[]="livros.bin", arq_arvoreB[]="btree.bin";
 	do{ 
 		system("cls");
 	 	printf("\n        Menu");
@@ -101,7 +103,29 @@ int main(){
 	
 		switch(resp){
 			case 1:{
-		    	//arrumar 
+	    			//insercao arrumar pra caso geral ao invez do while direto
+					if (abrir_arquivo("btree.bin", "rt+") == 1){ 
+						printf("\nentrei abrir arquivo\n");  
+					    raiz = pegar_raiz(); 
+					} 
+					else { 
+						printf("\n entrei criar arquivo there\n");  
+					    raiz = criar_arvore(chave);     }    
+					while (chave !='q') { 	
+						
+						printf("\n entrei while main chave --> %c\n", chave);
+					    promovido = inserir(raiz, chave, &promo_rrn, &promo_chave); 
+					    if (promovido) {
+					    	printf ("raiz %c promovida\n\007", promo_chave); 
+						    raiz = criar_raiz(promo_chave, raiz, promo_rrn);
+						}
+						chave = whatchave[i]; 
+					    i++;
+					}
+					fechar_arquivo(&btfd); 
+					
+					printf("\n saindo...\n");
+					getch();
 				break;
 			}
 		  	case 2:{
@@ -123,11 +147,10 @@ int main(){
 				break;
 			}
 	  		case 6:{
-		    	sair = 1;
-				break;
+		    	break;
 			}
 			case 7:{
-				//dum arquivo antigo
+				//dump arquivo antigo
 					/*	system("cls");
 		  		do{
 					printf("\n\nDigite qual arquivo deseja exibir: ");
@@ -151,28 +174,6 @@ int main(){
 			} 
 		}
 	}while(sair != 1);
-	
-	//insercao arrumar pra caso geral ao invez do while direto
-	if (abrir_arquivo("btree.bin", "rt+") == 1){ 
-    	printf("\nentrei abrir arquivo\n");  
-        raiz = pegar_raiz(); 
-    } 
-    else { 
-    	printf("\n entrei criar arquivo there\n");  
-        raiz = criar_arvore();     }    
-    while (chave !='q') { 	
-    	
-    	printf("\n entrei while main chave --> %c\n", chave);
-        promovido = inserir(raiz, chave, &promo_rrn, &promo_chave); 
-        if (promovido) {
- 	    	printf ("raiz %c promovida\n\007", promo_chave); 
-		    raiz = criar_raiz(promo_chave, raiz, promo_rrn);
-		}
-		chave = whatchave[i]; 
- 	    i++;
-    }
-	fechar_arquivo(btfd); 
-    printf("\n saindo...\n");
 }   
 
 int inserir (int rrn, char chave, int *promo_r_filho, char *promo_chave){ 
@@ -202,16 +203,16 @@ int inserir (int rrn, char chave, int *promo_r_filho, char *promo_chave){
     { 
     	return(NAO); 
 	}
-	printf ("Chave %c promovida\n\007", chave); 
-    if(pagina.cont < MAXCHAVES) 
+	if(pagina.cont < MAXCHAVES) 
     { 
     	esta_na_pagina(p_b_chave, p_b_rrn, &pagina); 
         escrever_arquivo(rrn, &pagina);
-		printf ("Erro: Chave %c duplicada\n\007", chave);  
+		//printf ("Erro: Chave %c duplicada\n\007", chave);  
         return(NAO); 
     } 
     else{
-		split(p_b_chave, p_b_rrn, &pagina, promo_chave, promo_r_filho, &nova_pagina); 
+		split(p_b_chave, p_b_rrn, &pagina, promo_chave, promo_r_filho, &nova_pagina);
+		printf ("Chave %c promovida\n\007", promo_chave);  
 		printf("\nChave %c inserida com sucesso.\n",promo_chave);
     	escrever_arquivo(rrn, &pagina); 
 	    escrever_arquivo(*promo_r_filho, &nova_pagina);
@@ -250,14 +251,12 @@ void inserir_raiz(int raiz){
 	printf("\n entrei inserir raiz %c\n", raiz);
 } 
  
-int criar_arvore(){ 
-      char chave; 
+int criar_arvore(char chave){ 
       btfd = fopen("btree.bin","wt+"); 
       printf("\n arquivo criado \n");  
       fclose (btfd); 
       abrir_arquivo("btree.bin","wt+"); 
-      chave = 't';//getchar(); 
-      return (criar_raiz(chave, NULO, NULO)); 
+     return (criar_raiz(chave, NULO, NULO)); 
 } 
  
 int pegar_pagina() { 
@@ -379,8 +378,8 @@ void split(char chave, int r_filho, BTpagina *p_pag_antiga, char *promo_chave, i
 
 /* carrega todos arquivos */ 
 int carregar_arquivo(int resp){
-	char arq_cadastro[]="biblioteca.bin", arq_busca[]="busca.bin", arq_consulta_casada[]="consulta_casada.bin",
-		 arq_remove[]= "remove.bin";
+	char cadastro_arq[]="biblioteca.bin", busca_arq[]="busca.bin", consulta_casada_arq[]="consulta_casada.bin",
+		 remove_arq[]= "remove.bin";
   	int i, tam_vet_inserir = 0, todos=0;
   
   	system("cls");
@@ -389,7 +388,7 @@ int carregar_arquivo(int resp){
   	}
   	/* abre arquivo biblioteca, carrega em vetor de struct */
   	if(resp == 1 || todos == 0){
-		if(abrir_arquivo(arq_cadastro, leitura)){
+		if(abrir_arquivo(cadastro_arq, leitura)){
 	  		i=0;
 	    	while(fread(&arq_livros[i], sizeof(livro), 1, arq)){
 	      		i++;  
@@ -400,9 +399,9 @@ int carregar_arquivo(int resp){
   	}
   	/* abre arquivo busca.bin, carrega em vetor de struct */
   	if(resp == 2 || todos == 0){
-		if(abrir_arquivo(arq_busca, leitura)){
+		if(abrir_arquivo(busca_arq, leitura)){
 		    i=0;
-			while(fread(&busca[i], sizeof(struct busca_arquivo), 1, arq)){
+			while(fread(&arq_busca[i], sizeof(struct busca_arquivo), 1, arq)){
 				i++;
 			}
 			fechar_arquivo(&arq);
@@ -410,9 +409,9 @@ int carregar_arquivo(int resp){
   	} 
   	/* abre arquivo consulta_casada.bin, carrega em vetor de struct */
   	if(resp == 3 || todos == 0){
-	  	if(abrir_arquivo(arq_consulta_casada, leitura)){
+	  	if(abrir_arquivo(consulta_casada_arq, leitura)){
 	    	i=0;
-			while(fread(&consulta_casada[i], sizeof(struct busca_casada), 1, arq)){
+			while(fread(&arq_consulta_casada[i], sizeof(struct busca_casada), 1, arq)){
 			  i++;
 			}
 			fechar_arquivo(&arq);
