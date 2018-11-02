@@ -46,7 +46,6 @@ struct busca_remove{
 	char isbn[14];
 }arq_remove[TAM_STRUCT];
 
-
 #define TAMPAG sizeof(BTpagina) 
 
 /* variaveis globais */ 
@@ -76,14 +75,13 @@ int criar_raiz (char chave, int esquerda, int direita);
 int inserir (int rrn, char chave, int *promo_r_filho, char *promo_chave);
 BTpagina ler_arquivo (int rrn, BTpagina *ponteiro_pag); 
 
-/*menu principal*/
 int main(){ 
 	int promovido;		/* boolean: tells if a promotion from below */
     int raiz,i=0,   	/* rrn of raiz page */
         promo_rrn;  	/* rrn promovido from below */
     char promo_chave,	/* chave promovido from below */ 
         chave='t', 
-		whatchave[12]={'h','i','a','g','o','p','o','l','y','c','a','q'};          /* next chave to inserir in tree */
+		whatchave[7]={'h','i','a','g','o','p','q'};          /* next chave to inserir in tree */
     printf("\n hello there\n");     
     
 	int resp, sair = 0, tam_vet_inserir = 0;
@@ -100,8 +98,8 @@ int main(){
 	  	printf("\n7 - Dump Arquivo ");
 	  	printf("\n8 - Sair");
 	  	printf("\nOpcao: ");
-	  	scanf("%d",&resp);
-	
+	 // 	scanf("%d",&resp);
+	resp=1;
 		switch(resp){
 			case 1:{
 	    			//insercao arrumar pra caso geral ao invez do while direto
@@ -174,6 +172,7 @@ int main(){
 				break;
 			} 
 		}
+		sair=1;
 	}while(sair != 1);
 }   
 
@@ -213,8 +212,8 @@ int inserir (int rrn, char chave, int *promo_r_filho, char *promo_chave){
     } 
     else{
 		split(p_b_chave, p_b_rrn, &pagina, promo_chave, promo_r_filho, &nova_pagina);
-		printf ("Chave %c promovida\n\007", promo_chave);  
-		printf("\nChave %c inserida com sucesso.\n",promo_chave);
+		printf ("Chave %c promovida\n\007", *promo_chave);  
+		printf("\nChave %c inserida com sucesso.\n",*promo_chave);
     	escrever_arquivo(rrn, &pagina); 
 	    escrever_arquivo(*promo_r_filho, &nova_pagina);
 		return(SIM); 
@@ -335,46 +334,54 @@ void esta_na_pagina(char chave,int r_filho, BTpagina *p_pag) {
 void split(char chave, int r_filho, BTpagina *p_pag_antiga, char *promo_chave, int *promo_r_filho, BTpagina *p_nova_pag){ 
     int j; 
     int mid; 
-	char workkeys[MAXCHAVES+1]; 
-	int workchil[MAXCHAVES+2]; 
+	char vet_chave[MAXCHAVES+1]; 
+	int vet_filhos[MAXCHAVES+2];
+	int vet_offset[MAXCHAVES+1]; 
     printf("\nDivisão de nó\n");
-	//coloca os elementos da pagina no vetor    
+	/* coloca os elementos da pagina no vetor temporario */
     for (j = 0; j < MAXCHAVES; j++){ 
-    	workkeys[j] = p_pag_antiga->chave[j]; 
-        workchil[j] = p_pag_antiga->filhos[j];
-		printf(" %c ",workkeys[j]); 
+    	vet_chave[j] = p_pag_antiga->chave[j]; 
+        vet_filhos[j] = p_pag_antiga->filhos[j];
+        vet_offset[j] = p_pag_antiga->offset[j];
+		printf(" %c ",vet_chave[j]); 
 	}
-    workchil[j] = p_pag_antiga->filhos[j]; 
+    vet_filhos[3] = p_pag_antiga->filhos[3]; 
     
-    //reoordena e encontra o lugar em que a nova chave deve ser inserida
-    for (j = MAXCHAVES; chave < workkeys[j-1] && j > 0; j--){ 
-        workkeys[j] = workkeys[j-1]; 
-        workchil[j+1] = workchil[j]; 
+    /* reoordena e encontra o lugar em que a nova chave deve ser inserida */
+    for (j = MAXCHAVES; chave < vet_chave[j-1] && j > 0; j--){ 
+        vet_chave[j] = vet_chave[j-1]; 
+        vet_filhos[j+1] = vet_filhos[j];
+        vet_offset[j+1] = vet_offset[j];
+		 
     }
-	//insere chave onde deve ficar e coloca chave antiga no filho 
-    workkeys[j] = chave; 
-    workchil[j+1] = r_filho; 
+	/* insere chave onde deve ficar e coloca chave antiga no filho */
+    vet_chave[j] = chave; 
+    vet_filhos[j+1] = r_filho; 
 	
-	//cria nova pagina com o promovido
-	*promo_r_filho = pegar_pagina(); 
+	/* cria nova pagina com o promovido */
+	(*promo_r_filho) = pegar_pagina(); 
 	inicializar_pagina(p_nova_pag);
+	inicializar_pagina(p_pag_antiga);
 	
-	//coloca as paginas nos devidos lugares 
-	for (j = 0; j < MINCHAVES; j++){ 
-		p_pag_antiga->chave[j] = workkeys[j]; 
-	   	p_pag_antiga->filhos[j] = workchil[j]; 
-	    p_nova_pag->chave[j] = workkeys[j+MINCHAVES]; 
-	    p_nova_pag->filhos[j] = workchil[j+MINCHAVES]; 
-	    p_pag_antiga->chave[j+MINCHAVES] = NO;            
-	    p_pag_antiga->filhos[j+MINCHAVES] = NULO; 
-   } 
+	/* coloca as paginas nos devidos lugares */
+	//for (j = 0; j < MINCHAVES; j++){ 
+	p_pag_antiga->cont = 2; 
+	p_pag_antiga->chave[0] = vet_chave[0]; 
+	p_pag_antiga->chave[1] = vet_chave[1];    
+	p_pag_antiga->filhos[0] = vet_filhos[0]; 	
+	p_pag_antiga->filhos[1] = vet_filhos[1]; 	
+	p_pag_antiga->filhos[2] = vet_filhos[2];
+	p_pag_antiga->chave[2] = NO;            
+	p_pag_antiga->filhos[2] = NULO; 
+   //} 
    //nao sei se ta certo, conferir
-   p_pag_antiga->filhos[0] = workchil[0]; 
-   p_nova_pag->filhos[0] = workchil[MINCHAVES]; 
-   p_nova_pag->cont = MAXCHAVES - MINCHAVES; 
-   p_pag_antiga->cont = MINCHAVES; 
-   *promo_chave = workkeys[MINCHAVES+1];
-   printf ("\nChave %c promovida\n", *promo_chave); 
+   	p_nova_pag->cont =MINCHAVES;
+   	p_nova_pag->chave[0] = vet_chave[3]; 
+	p_nova_pag->filhos[0] = vet_filhos[3];
+	p_nova_pag->filhos[1] = vet_filhos[4]; 
+	
+	(*promo_chave) = vet_chave[2];
+	printf ("\nChave %c promovida\n", *promo_chave);
 }
 
 /* carrega todos arquivos */ 
