@@ -13,13 +13,12 @@
 #define TAM_STRUCT 100 
  
 /* structs do arquivo */
-
 /* struct da arvore b */
 typedef struct pag{ 
 	int cont;          		 /* cont de chaves na página */
     char chave[MAXCHAVES];   /* chave atual */
     int filhos[MAXCHAVES+1]; /* ponteiro para os rrn filhos | o num de filhos e igual a ordem entao maxchaves + 1 */
-    int offset[MAXCHAVES];	 /* offset do arquivo de chaves */
+    char offsets[MAXCHAVES]; //offsets dos registros  
 }BTpagina; 
 
 /* arquivo biblioteca.bin */
@@ -60,7 +59,7 @@ int qtd_chave_s = 0;
  
 /* prototypes */ 
 void split(char chave, int r_filho, BTpagina *p_pag_antiga, char *promo_chave, int *promo_r_filho, BTpagina *p_nova_pag); 
-void esta_na_pagina (char chave,int r_filho, BTpagina *p_pag); 
+void esta_na_pagina (char chave, int r_filho, BTpagina *p_pag); 
 void escrever_arquivo (int rrn, BTpagina *ponteiro_pag);
 void inicializar_pagina (BTpagina *p_pag); 
 void inserir_raiz(int raiz); 
@@ -77,11 +76,11 @@ BTpagina ler_arquivo (int rrn, BTpagina *ponteiro_pag);
 
 int main(){ 
 	int promovido;		/* boolean: tells if a promotion from below */
-    int raiz,i=0,   	/* rrn of raiz page */
-        promo_rrn;  	/* rrn promovido from below */
+    int raiz, i=0,   	/* rrn of raiz page */
+		promo_rrn;  	/* rrn promovido from below */
     char promo_chave,	/* chave promovido from below */ 
-        chave='t', 
-		whatchave[7]={'h','i','a','g','o','p','q'};          /* next chave to inserir in tree */
+        chave = 't', 
+		whatchave[9]={'h','i','a','g','o','p','q','w','b'};          /* next chave to inserir in tree */
     printf("\n hello there\n");     
     
 	int resp, sair = 0, tam_vet_inserir = 0;
@@ -98,32 +97,38 @@ int main(){
 	  	printf("\n7 - Dump Arquivo ");
 	  	printf("\n8 - Sair");
 	  	printf("\nOpcao: ");
-	 // 	scanf("%d",&resp);
-	resp=1;
+		// scanf("%d",&resp);
+		resp=1;
 		switch(resp){
 			case 1:{
 	    			//insercao arrumar pra caso geral ao invez do while direto
 					if (abrir_arquivo("btree.bin", "rt+") == 1){ 
-						printf("\nentrei abrir arquivo\n");  
+						printf("\n\nArquivo já existe");  
 					    raiz = pegar_raiz(); 
+					    printf("\nRaiz: %d", raiz);
 					} 
 					else { 
-						printf("\n entrei criar arquivo there\n");  
-					    raiz = criar_arvore(chave);     }    
-					while (chave !='q') { 	
-						
-						printf("\n entrei while main chave --> %c\n", chave);
+						printf("\n\nArquivo nao existe, criando arvore.");  
+					    raiz = criar_arvore(chave);
+					    printf("\nteste: %d", pegar_raiz());
+					}   
+					
+					getch();
+					 
+					while (chave !='b') { 	
+						chave = whatchave[i]; 	
+						printf("\nInserindo a chave %c", chave);
 					    promovido = inserir(raiz, chave, &promo_rrn, &promo_chave); 
 					    if (promovido) {
 					    	printf ("raiz %c promovida\n\007", promo_chave); 
 						    raiz = criar_raiz(promo_chave, raiz, promo_rrn);
 						}
-						chave = whatchave[i]; 
 					    i++;
+					    getch();
 					}
 					fechar_arquivo(&btfd); 
 					
-					printf("\n saindo...\n");
+					printf("\nsaindo...");
 					getch();
 				break;
 			}
@@ -141,7 +146,7 @@ int main(){
 	  		case 5:{
 				resp=0;
 			    tam_vet_inserir = carregar_arquivo(resp); 
-			    printf("\nArquivos Carregados\n");
+			    printf("\nArquivos Carregados");
 			    system("pause");
 				break;
 			}
@@ -176,7 +181,7 @@ int main(){
 	}while(sair != 1);
 }   
 
-int inserir (int rrn, char chave, int *promo_r_filho, char *promo_chave){ 
+int inserir(int rrn, char chave, int *promo_r_filho, char *promo_chave){ 
 	BTpagina pagina,		//pagina atual 
            nova_pagina;    	//nova pagina caso exista split 
 	int achou, promovido;  	//valores booleanos 
@@ -184,33 +189,28 @@ int inserir (int rrn, char chave, int *promo_r_filho, char *promo_chave){
 	    p_b_rrn;        	// rrn promovido da recursão abaixo 
     char p_b_chave;         // chave promovido da recursão abaixo 
         
-    if (rrn == NULO) 
-    {   
+    if(rrn == NULO){   
     	*promo_chave = chave; 
         *promo_r_filho = NULO; 
         return(SIM); 
     } 
     ler_arquivo(rrn, &pagina); 
     //verifica se existe chave duplicada
-    achou = procurar_no ( chave, &pagina, &pos); 
-    if (achou) 
-    { 
-    	printf ("Erro: Chave %c duplicada\n\007", chave); 
+    achou = procurar_no(chave, &pagina, &pos); 
+    if (achou){ 
+    	printf("Erro: Chave %c duplicada\n\007", chave); 
         return(0); 
     } 
     promovido = inserir(pagina.filhos[pos], chave, &p_b_rrn, &p_b_chave); 
-    if (!promovido) 
-    { 
+    if(!promovido){ 
     	return(NAO); 
 	}
-	if(pagina.cont < MAXCHAVES) 
-    { 
+	if(pagina.cont < MAXCHAVES){ 
     	esta_na_pagina(p_b_chave, p_b_rrn, &pagina); 
         escrever_arquivo(rrn, &pagina);
 		//printf ("Erro: Chave %c duplicada\n\007", chave);  
         return(NAO); 
-    } 
-    else{
+    }else{
 		split(p_b_chave, p_b_rrn, &pagina, promo_chave, promo_r_filho, &nova_pagina);
 		printf ("Chave %c promovida\n\007", *promo_chave);  
 		printf("\nChave %c inserida com sucesso.\n",*promo_chave);
@@ -229,7 +229,7 @@ int abrir_arquivo(char nome_arq[], char tipo_abertura[]) {
 	}
 	if((arq = fopen(nome_arq, tipo_abertura)) == NULL)
 			return 0;
-	    return 1;	 
+	return 1;	 
 } 
  
 void fechar_arquivo(FILE **p_arq){ 
@@ -238,72 +238,78 @@ void fechar_arquivo(FILE **p_arq){
  
 int pegar_raiz() { 
 	fseek(btfd, 0, 0); 
-    if (fread(&raiz,sizeof(int),1, btfd) == NULL) { 
+    if(fread(&raiz,sizeof(int),1, btfd) == NULL) { 
     	printf("Erro: Impossivel pegar raiz. \007\n"); 
         exit(1); 
 	}
-    return (raiz); 
+    return(raiz); 
 } 
  
 void inserir_raiz(int raiz){ 	
 	fseek(btfd, 0, 0); 
     fwrite(&raiz, sizeof(raiz),1,btfd); 
-	printf("\n entrei inserir raiz %c\n", raiz);
+	printf("\n entrei inserir raiz: %d", raiz);
 } 
  
 int criar_arvore(char chave){ 
-      btfd = fopen("btree.bin","wt+"); 
-      printf("\n arquivo criado \n");  
-      fclose (btfd); 
-      abrir_arquivo("btree.bin","wt+"); 
-     return (criar_raiz(chave, NULO, NULO)); 
+	btfd = fopen("btree.bin","wt+"); 
+	printf("\narquivo criado");
+	inserir_raiz(-1);  									//mudei
+	fclose (btfd); 
+	getch();
+	abrir_arquivo("btree.bin","wt+"); 
+	return (criar_raiz(chave, NULO, NULO)); 
 } 
  
-int pegar_pagina() { 
-	printf("\n\nentrei pegar pagina\n");
+int pegar_pagina(){ 
+	printf("\nentrei pegar pagina");
 	int addr; 
 	fseek(btfd, 0, 2);
-	addr = ftell(btfd); 
+	addr = ftell(btfd) + 4; 
+	printf("\nendereco: %d", addr);
 	return (addr/TAMPAG); 
 } 
  
-BTpagina ler_arquivo (int rrn, BTpagina *ponteiro_pag){ 
+BTpagina ler_arquivo(int rrn, BTpagina *ponteiro_pag){ 
 	int addr; 
-	addr  = rrn * TAMPAG; 
+	addr  = (rrn * TAMPAG) + 4; 	
+	printf("\n\nendereco: %d", addr);
 	fseek(btfd, addr, 0); 
 	fread(ponteiro_pag, sizeof(BTpagina), 1, btfd); 
+	printf("\nTESTE: %d\n", ponteiro_pag->cont);
+	getch();
 	return *ponteiro_pag;
 } 
  
 void escrever_arquivo(int rrn, BTpagina *ponteiro_pag) { 
 	int addr; 
-	addr = rrn * TAMPAG; 
+	addr = (rrn * TAMPAG) + 4; 
 	fseek(btfd, addr, 0); 
 	fwrite(&*ponteiro_pag,TAMPAG, 1,btfd); 
-	printf("\n\nescrevi no arquivo\n");
+	printf("\nescrevi no arquivo");
 }                  
 
 int criar_raiz(char chave, int esquerda, int direita) { 
-	printf("\n\nentrei criar raiz\n");
+	printf("\n\nentrei criar raiz");
    	BTpagina pagina; 
    	int rrn; 
    	rrn = pegar_pagina();
-	printf("\n\nrrn %d\n",rrn); 
-   	inicializar_pagina (&pagina); 
+	printf("\nrrn: %d",rrn); 
+   	inicializar_pagina(&pagina); 
    	pagina.chave[0] = chave; 
    	pagina.filhos[0] = esquerda; 
    	pagina.filhos[1] = direita; 
    	pagina.cont = 1; 
    	escrever_arquivo(rrn, &pagina); 
    	inserir_raiz(rrn); 
-   	printf("\n entrei criar raiz, \n\nraiz criada %d\n", rrn);
+   	printf("\nraiz criada");
    	return(rrn); 
 } 
  
 void inicializar_pagina(BTpagina *p_pag) { 
 	int j; 
-	printf("\n\entrei inicializar pagina\n");
-	for (j = 0; j < MAXCHAVES; j++){ 
+	printf("\nentrei inicializar pagina");
+	for(j = 0; j < MAXCHAVES; j++){ 
 	   p_pag->chave[j] = NO; 
 	   p_pag->filhos[j] = NULO; 
 	} 
@@ -312,9 +318,9 @@ void inicializar_pagina(BTpagina *p_pag) {
  
 int procurar_no(char chave, BTpagina *p_pag, int *pos){ 
     int i; 
-    for (i = 0; i < p_pag->cont && chave > p_pag->chave[i]; i++); 
+    for(i = 0; i < p_pag->cont && chave > p_pag->chave[i]; i++); 
     *pos = i; 
-    if (*pos < p_pag->cont && chave == p_pag->chave[*pos]) { 
+    if(*pos < p_pag->cont && chave == p_pag->chave[*pos]) { 
     	return(SIM); 
     } 
     return(NAO); 
@@ -322,7 +328,7 @@ int procurar_no(char chave, BTpagina *p_pag, int *pos){
               
 void esta_na_pagina(char chave,int r_filho, BTpagina *p_pag) { 
 	int j; 
-	for(j = p_pag-> cont; chave < p_pag->chave[j-1] && j > 0; j--){ 
+	for(j = p_pag->cont; chave < p_pag->chave[j-1] && j > 0; j--){ 
 		p_pag->chave[j] = p_pag->chave[j-1]; 
 	    p_pag->filhos[j+1] = p_pag->filhos[j]; 
 	} 
@@ -336,23 +342,18 @@ void split(char chave, int r_filho, BTpagina *p_pag_antiga, char *promo_chave, i
     int mid; 
 	char vet_chave[MAXCHAVES+1]; 
 	int vet_filhos[MAXCHAVES+2];
-	int vet_offset[MAXCHAVES+1]; 
     printf("\nDivisão de nó\n");
 	/* coloca os elementos da pagina no vetor temporario */
-    for (j = 0; j < MAXCHAVES; j++){ 
+    for(j = 0; j < MAXCHAVES; j++){ 
     	vet_chave[j] = p_pag_antiga->chave[j]; 
         vet_filhos[j] = p_pag_antiga->filhos[j];
-        vet_offset[j] = p_pag_antiga->offset[j];
-		printf(" %c ",vet_chave[j]); 
 	}
     vet_filhos[3] = p_pag_antiga->filhos[3]; 
     
     /* reoordena e encontra o lugar em que a nova chave deve ser inserida */
-    for (j = MAXCHAVES; chave < vet_chave[j-1] && j > 0; j--){ 
+    for(j = MAXCHAVES; chave < vet_chave[j-1] && j > 0; j--){ 
         vet_chave[j] = vet_chave[j-1]; 
         vet_filhos[j+1] = vet_filhos[j];
-        vet_offset[j+1] = vet_offset[j];
-		 
     }
 	/* insere chave onde deve ficar e coloca chave antiga no filho */
     vet_chave[j] = chave; 
@@ -364,24 +365,25 @@ void split(char chave, int r_filho, BTpagina *p_pag_antiga, char *promo_chave, i
 	inicializar_pagina(p_pag_antiga);
 	
 	/* coloca as paginas nos devidos lugares */
-	//for (j = 0; j < MINCHAVES; j++){ 
 	p_pag_antiga->cont = 2; 
-	p_pag_antiga->chave[0] = vet_chave[0]; 
+	p_pag_antiga->chave[0] = vet_chave[0];
+	p_pag_antiga-> 
 	p_pag_antiga->chave[1] = vet_chave[1];    
 	p_pag_antiga->filhos[0] = vet_filhos[0]; 	
 	p_pag_antiga->filhos[1] = vet_filhos[1]; 	
 	p_pag_antiga->filhos[2] = vet_filhos[2];
+	
 	p_pag_antiga->chave[2] = NO;            
 	p_pag_antiga->filhos[2] = NULO; 
-   //} 
-   //nao sei se ta certo, conferir
-   	p_nova_pag->cont =MINCHAVES;
+   
+   	//nao sei se ta certo, conferir
+   	p_nova_pag->cont = MINCHAVES;
    	p_nova_pag->chave[0] = vet_chave[3]; 
 	p_nova_pag->filhos[0] = vet_filhos[3];
 	p_nova_pag->filhos[1] = vet_filhos[4]; 
 	
 	(*promo_chave) = vet_chave[2];
-	printf ("\nChave %c promovida\n", *promo_chave);
+	printf ("\nChave '%c' promovida\n", *promo_chave);
 }
 
 /* carrega todos arquivos */ 
