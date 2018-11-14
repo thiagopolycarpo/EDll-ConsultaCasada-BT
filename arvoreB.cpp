@@ -54,9 +54,9 @@ FILE *btfd;  /* arquivo da arvore b */
 FILE *infd;  /* arquivo da biblioteca */
 FILE *arq;	 /* outros arquivos */
 
-/* variaveis globais para abertura de arquivo */
+/* variaveis globais */
 char atualizar[] = "ab", leitura[] = "r+b", escrever[] = "wb";
-int qtd_chave_s = 0;
+int qtd_chave_s = 0, tam_vet_inserir = 0, cont_buscas = 0;
  
 /* prototypes */ 
 void split(char chave[], int offset, int r_filho, BTpagina *p_pag_antiga, char promo_chave[], int *promo_offset,
@@ -70,21 +70,24 @@ int abrir_arquivo (char nome_arq[], char tipo_abertura[]);
 int pegar_raiz (); 
 int pegar_pagina ();
 int criar_arvore(char chave[], int offset);
-int carregar_arquivo(int resp);
 int procurar_no(char chave[], BTpagina *p_pag, int *pos);
 int criar_raiz(char chave[], int offset, int esquerda, int direita);
 int inserir_arvoreB(int rrn, char chave[], int offset, int *promo_r_filho, char promo_chave[], int *promo_offset);
 BTpagina ler_arquivo (int rrn, BTpagina *ponteiro_pag); 
 int percorrer_arvore(int raiz);
+int buscar();
+int buscar_isbn(char chave[], int raiz, int *pos_pagina, int *pos_registro, int *offset);
+void exibir_pagina(BTpagina pagina);
 
 
-int inserir_arq_principal(int qtdlivros);
+int inserir_arq_principal();
 int criar_arquivo(char nome_arq[]);
 int inserir_arq_indice(char isbn[], int offset, int cont_insercao);
 void exibir_registro(int offset);
+void carregar_arquivo(int resp);
 
 int main(){     
-	int resp, sair = 0, tam_vet_inserir = 0;
+	int resp, sair = 0;
 	char arq_livros[]="livros.bin", arq_arvoreB[]="btree.bin";
 	do{ 
 		system("cls");
@@ -101,7 +104,7 @@ int main(){
 		scanf("%d",&resp);
 		switch(resp){
 			case 1:{
-				inserir_arq_principal(tam_vet_inserir);	
+				inserir_arq_principal();	
 				break;
 			}
 		  	case 2:{
@@ -110,10 +113,12 @@ int main(){
 		  		abrir_arquivo("btree.bin", "rb+");
 				int raiz = pegar_raiz();
 		  		percorrer_arvore(raiz);
+		  		fclose(btfd);
 				getch();
 				break;
 			}
-		  	case 3: {
+		  	case 3:{
+				buscar();
 	  			break;
 	  		}
 	  		case 4:{
@@ -121,8 +126,8 @@ int main(){
 			}
 	  		case 5:{
 				resp=0;
-			    tam_vet_inserir = carregar_arquivo(resp); 
-			    printf("\nArquivos Carregados");
+			    carregar_arquivo(resp); 
+			    printf("\nArquivos Carregados %d %d", tam_vet_inserir, cont_buscas);
 			    getch();
 				break;
 			}
@@ -162,7 +167,7 @@ int main(){
 }   
 
 
-int inserir_arq_principal(int qtd_livros_carregados){
+int inserir_arq_principal(){
 	char nome_arq[] = "livros.bin";
 	int cont_insercao, pos_registro;
 	livro lvr;
@@ -177,7 +182,7 @@ int inserir_arq_principal(int qtd_livros_carregados){
 	printf("\nContador insercao: %d", cont_insercao);
 	fclose(arq);
 	
-	if(cont_insercao < qtd_livros_carregados){
+	if(cont_insercao < tam_vet_inserir){
 		
 		if(!abrir_arquivo(nome_arq, "ab+")){
 			printf("\nErro, arquivo nao pode ser aberto");
@@ -330,7 +335,7 @@ BTpagina ler_arquivo(int rrn, BTpagina *ponteiro_pag){
 	int addr; 
 	addr  = (rrn * TAMPAG) + 4; 	
 	fseek(btfd, addr, 0); 
-	fread(ponteiro_pag, sizeof(BTpagina), 1, btfd); 
+	fread(ponteiro_pag, sizeof(BTpagina), 1, btfd);
 	return *ponteiro_pag;
 } 
  
@@ -369,13 +374,13 @@ void inicializar_pagina(BTpagina *p_pag) {
  
 int procurar_no(char chave[], BTpagina *p_pag, int *pos){ 
     int i; 
-    printf("\n\nPagina:");
+//    printf("\n\nPagina:");
     for(i = 0; i < p_pag->cont && (strcmp(chave,p_pag->chave[i])>0); i++){
-		printf("\nisbn: %s || offset: %d || filho e: %d || filho d: %d", p_pag->chave[i], p_pag->offset[i],
-					 p_pag->filhos[i], p_pag->filhos[i+1]);
+//		printf("\nisbn: %s || offset: %d || filho e: %d || filho d: %d", p_pag->chave[i], p_pag->offset[i],
+//					 p_pag->filhos[i], p_pag->filhos[i+1]);
 	} 
-	printf("\nisbn: %s || offset: %d || filho e: %d || filho d: %d\n", p_pag->chave[i], p_pag->offset[i],
-					 p_pag->filhos[i], p_pag->filhos[i+1]);
+//	printf("\nisbn: %s || offset: %d || filho e: %d || filho d: %d\n", p_pag->chave[i], p_pag->offset[i],
+//					 p_pag->filhos[i], p_pag->filhos[i+1]);
     *pos = i; 
     if(*pos < p_pag->cont && (strcmp(chave,p_pag->chave[*pos])==0)){ 
     	return(SIM); 
@@ -456,10 +461,10 @@ void split(char chave[], int offset, int r_filho, BTpagina *p_pag_antiga, char p
 }
 
 /* carrega todos arquivos */ 
-int carregar_arquivo(int resp){
+void carregar_arquivo(int resp){
 	char cadastro_arq[]="biblioteca.bin", busca_arq[]="busca.bin", consulta_casada_arq[]="consulta_casada.bin",
 		 remove_arq[]= "remove.bin";
-  	int i, tam_vet_inserir = 0, todos=0;
+  	int i, todos=0;
   
   	system("cls");
   	if(resp != 0){
@@ -476,15 +481,19 @@ int carregar_arquivo(int resp){
 	    	}
 	    fechar_arquivo(&arq);
 	  	tam_vet_inserir = i;  
+	  	
 	  }
   	}
   	/* abre arquivo busca.bin, carrega em vetor de struct */
+  	printf("\n\ndados da busca:");
   	if(resp == 2 || todos == 0){
 		if(abrir_arquivo(busca_arq, leitura)){
 		    i=0;
 			while(fread(&arq_busca[i], sizeof(struct busca_arquivo), 1, arq)){
+				printf("\nIsbn: %s", arq_busca[i].isbn);
 				i++;
 			}
+			cont_buscas = i;
 			fechar_arquivo(&arq);
 		}
   	} 
@@ -498,14 +507,14 @@ int carregar_arquivo(int resp){
 			fechar_arquivo(&arq);
 	  	}
   	}
-  	return tam_vet_inserir;
 }
 
 int criar_arquivo(char nome_arq[]){
 	int cont = 0;
 	
 	abrir_arquivo(nome_arq, "wb+");
-	fwrite(&cont, sizeof(int), 1, arq);
+	fwrite(&cont, sizeof(int), 1, arq);  //contador de inserção
+	fwrite(&cont, sizeof(int), 1, arq);  //contador de buscas
 	fclose(arq);
 	printf("\nArquivo Criado");
 }
@@ -535,7 +544,7 @@ void exibir_registro(int offset){
 	abrir_arquivo("livros.bin", "rb+");
 	fseek(arq, offset, 0);
 	fread(&lvr, sizeof(livro), 1, arq);
-	printf("\nIsbn: %s - Titulo: %s - Autor: %s - Ano: %s", lvr.isbn, lvr.titulo, lvr.autor, lvr.ano);
+	printf("\n%s | %s | %s | %s", lvr.isbn, lvr.titulo, lvr.autor, lvr.ano);
 	fclose(arq);
 }
 
@@ -544,6 +553,62 @@ void exibir_pagina(BTpagina pagina){
 	for(int i = 0; i < pagina.cont; i++){
 		printf("\nIsbn: %s  || offset: %d", pagina.chave[i], pagina.offset[i]);
 	}
+}
+
+//efetua a busca de um registro dado o isbn
+int buscar(){	
+	int cont, raiz, pos_pagina = -1, pos_registro = -1, offset = -1, achou; 
+	system("cls");
+	abrir_arquivo("livros.bin", "rb+");
+	fseek(arq, 4,0);
+	fread(&cont, sizeof(int), 1, arq);
+	printf("\nContador: %d", cont);
+	fclose(arq);
+	
+	if(cont < cont_buscas){
+		abrir_arquivo("btree.bin", "rb+");
+		raiz = pegar_raiz();
+		printf("\nProcurando chave %s", arq_busca[cont].isbn);
+		achou = buscar_isbn(arq_busca[cont].isbn, raiz, &pos_pagina, &pos_registro, &offset);
+		fclose(btfd);
+		
+		if(achou){
+			printf("\n\nChave %s encontrada, pagina %d, posicao %d", arq_busca[cont].isbn, pos_pagina, pos_registro);
+			printf("\n\nLivro:");
+			exibir_registro(offset);
+		}else{
+			printf("\n\nChave %s nao encontrada", arq_busca[cont].isbn);
+		}
+		
+		//atualizando contador de buscas 
+		abrir_arquivo("livros.bin", "rb+");
+		fseek(arq, 4, 0);
+		cont++;
+		fwrite(&cont, sizeof(int), 1, arq);
+		fclose(arq);
+	}else{
+	  	printf("\n\nNao ha mais buscas");
+	}
+		  	
+	getch();
+}
+
+int buscar_isbn(char chave[], int raiz, int *pos_pagina, int *pos_registro, int *offset){
+	BTpagina pagina;
+	int achou, posicao;
+	
+	if(raiz == NULO) return NAO;
+	
+	ler_arquivo(raiz, &pagina);
+	
+	if(procurar_no(chave, &pagina, &posicao)){
+		*pos_pagina = raiz;
+		*pos_registro = posicao;
+		*offset = pagina.offset[posicao];
+		return SIM;
+	}
+	achou = buscar_isbn(chave, pagina.filhos[posicao], pos_pagina, pos_registro, offset);
+	return achou;
 }
 
 
