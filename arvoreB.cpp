@@ -136,11 +136,26 @@ int main(){
 	  		case 5:{
 				resp=0;
 			    carregar_arquivo(resp); 
-			    printf("\nArquivos Carregados %d %d", tam_vet_inserir, cont_buscas);
+			    printf("\nArquivos Carregados");
 			    getch();
 				break;
 			}
 	  		case 6:{
+	  			/*int pos_registro, pos_pagina, offset, achou, raiz;
+	  			char isbn[] = "2222222222222";	
+	  			raiz = pegar_raiz();
+				abrir_arquivo("btree.bin", "rb+");
+				achou = buscar_isbn(isbn, raiz, pos_pagina, pos_registro, offset);
+				
+				if(achou){
+					remover(isbn);
+				}else{
+					printf("\nIsbn %s nao esta na arvore!", isbn);
+				}
+				
+				fclose(btfd);
+				getch();	
+	  			*/
 		    	break;
 			}
 			case 7:{
@@ -178,7 +193,7 @@ int main(){
 
 int inserir_arq_principal(){
 	char nome_arq[] = "livros.bin";
-	int cont_insercao, pos_registro;
+	int cont_insercao, pos_registro, pos_pagina, offset, achou = 0;
 	livro lvr;
 	
 	system("cls");
@@ -198,14 +213,29 @@ int inserir_arq_principal(){
 			getch();
 			return 0;
 		}
-		//inserindo livro no arquivo
-		fwrite(&arq_livros[cont_insercao], sizeof(livro), 1, arq);
-		pos_registro =  ftell(arq) - sizeof(livro);						//pegando posição do registro
-		printf("\nArquivo com chave %s inserido com sucesso no arquivo de dados", arq_livros[cont_insercao].isbn);
-		fclose(arq);
 		
-		//inserindo no arquivo de indice
-		inserir_arq_indice(arq_livros[cont_insercao].isbn, pos_registro, cont_insercao);
+		//buscando chave para ver se ha chave duplicada 
+		//para a primeira inserção não é necessario a busca
+		if(cont_insercao > 0){
+			abrir_arquivo("btree.bin", "rt+");
+			achou = buscar_isbn(arq_livros[cont_insercao].isbn, pegar_raiz(), &pos_pagina, &pos_registro, &offset);
+			fclose(btfd);
+		}
+		
+		
+		if(!achou){	//verifica se achou o isbn
+			//inserindo livro no arquivo
+			fwrite(&arq_livros[cont_insercao], sizeof(livro), 1, arq);
+			pos_registro =  ftell(arq) - sizeof(livro);						//pegando posição do registro
+			printf("\nArquivo com chave %s inserido com sucesso no arquivo de dados", arq_livros[cont_insercao].isbn);
+			fclose(arq);
+			
+			//inserindo no arquivo de indice
+			inserir_arq_indice(arq_livros[cont_insercao].isbn, pos_registro, cont_insercao);
+			
+		}else{
+			printf("\nISBN %s duplicado", arq_livros[cont_insercao].isbn);
+		}
 		
 		//Atualizando contador de inserção
 		abrir_arquivo(nome_arq, "rb+");     //tem q usar o rb+, sei la o pq os outros não atualizam 
@@ -507,6 +537,7 @@ void carregar_arquivo(int resp){
 		}
   	} 
   	/* abre arquivo consulta_casada.bin, carrega em vetor de struct */
+  	printf("\n\nDados consulta casada");
   	if(resp == 3 || todos == 0){
 	  	if(abrir_arquivo(consulta_casada_arq, leitura)){
 	    	i=0;
@@ -656,11 +687,9 @@ void consulta_casada(){
 		if(resp == 1){
 			printf("\n Matching -> ");
 			match();
-			getch();
 		}else{
 			printf("\n Merging -> ");
 			merge();
-			getch();
 		}
 		//atualizando contador de buscas 
 		abrir_arquivo("livros.bin", "rb+");
@@ -761,14 +790,14 @@ void merge(){
 		}
 	}while(!fim_arq1 && !fim_arq2);
 	
-	if(fread(isbn_arq2,sizeof(char),14,arq2)){
+	if(!fim_arq2/*fread(isbn_arq2,sizeof(char),14,arq2)*/){
 		fseek(arq2,-14,1);
 		while(fread(isbn_arq2,sizeof(char),14,arq2)){
 			printf(" %s ",isbn_arq2);
 			fwrite(isbn_arq2,sizeof(char),14,arq);
 		}
 	}
-	if(fread(isbn_arq1,sizeof(char),14,arq1)){
+	if(!fim_arq1/*fread(isbn_arq1,sizeof(char),14,arq1)*/){
 		fseek(arq1,-14,1);
 		while(fread(isbn_arq1,sizeof(char),14,arq1)){
 			printf(" %s ",isbn_arq1);
@@ -813,16 +842,15 @@ void match(){
 	
 	fclose(arq);
 }
-	
-	
 
-	
-	
-	
 
-/*
-void pesquisa_menores(int rrn, int valor){}
-*/
- 
+/*int remover(char isbn[]){
+	 
+	
+	
+	
+}*/
+
+
 
 
