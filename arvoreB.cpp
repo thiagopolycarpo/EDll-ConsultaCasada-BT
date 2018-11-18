@@ -81,6 +81,16 @@ int buscar();
 int buscar_isbn(char chave[], int raiz, int *pos_pagina, int *pos_registro, int *offset);
 void exibir_pagina(BTpagina pagina);
 
+int remover(char isbn[], int raiz, int pos_pagina, int pos_registro, int offset);
+void remover_caso1(int pos_registro, int pos_pagina, BTpagina *p_pag);
+int achar_sucessor_imediato(int rrn, char sucessor[], int *offset_sucessor, int *pos_pag_suc, int *pos_reg_suc);
+void substituir_elemento_caso2(int pos_pagina, int pos_registro, char sucessor[], int offset_sucessor);
+int achar_pag_irmas(int pos_pagina, int raiz, char isbn[], int *pos_pag_pai, int *pos_reg_pai, 
+										int *pos_pag_irmaE, int *pos_pag_irmaD);
+void redistribuicao(int pos_reg_pai, BTpagina *pai, int pos_pag_irmao, BTpagina *irmao, BTpagina *alvo, int tipo_redist);
+int concatenacao(int pos_reg_pai, int pos_pag_pai, BTpagina *pai, int pos_pag_irmaE, BTpagina *irmaE, 
+						int pos_pag_irmaD, BTpagina *irmaD, int pos_pag_alvo, BTpagina *pag_alvo);
+void reorganiza_pai(BTpagina *pai, int pos_pai);
 
 int inserir_arq_principal();
 int criar_arquivo(char nome_arq[]);
@@ -141,21 +151,27 @@ int main(){
 				break;
 			}
 	  		case 6:{
-	  			/*int pos_registro, pos_pagina, offset, achou, raiz;
-	  			char isbn[] = "2222222222222";	
-	  			raiz = pegar_raiz();
+	  			int pos_registro, pos_pagina, offset, achou, raiz;
+//	  			char isbn[] = "4444444444444";	
+//	  			char isbn[] = "6666666666666";	
+//	  			char isbn[] = "5555555555555";
+//				char isbn[] = "8888888888888";
+//				char isbn[] = "2222222222222";	
+	  			char isbn[] = "1111111111111";
+				  			   
 				abrir_arquivo("btree.bin", "rb+");
-				achou = buscar_isbn(isbn, raiz, pos_pagina, pos_registro, offset);
+	  			raiz = pegar_raiz();
+				achou = buscar_isbn(isbn, raiz, &pos_pagina, &pos_registro, &offset);
 				
 				if(achou){
-					remover(isbn);
+					remover(isbn, raiz, pos_pagina, pos_registro, offset);
 				}else{
 					printf("\nIsbn %s nao esta na arvore!", isbn);
 				}
 				
 				fclose(btfd);
 				getch();	
-	  			*/
+	  			
 		    	break;
 			}
 			case 7:{
@@ -372,6 +388,7 @@ int pegar_pagina(){
  
 BTpagina ler_arquivo(int rrn, BTpagina *ponteiro_pag){ 
 	int addr; 
+	
 	addr  = (rrn * TAMPAG) + 4; 	
 	fseek(btfd, addr, 0); 
 	fread(ponteiro_pag, sizeof(BTpagina), 1, btfd);
@@ -413,13 +430,7 @@ void inicializar_pagina(BTpagina *p_pag) {
  
 int procurar_no(char chave[], BTpagina *p_pag, int *pos){ 
     int i; 
-//    printf("\n\nPagina:");
-    for(i = 0; i < p_pag->cont && (strcmp(chave,p_pag->chave[i])>0); i++){
-//		printf("\nisbn: %s || offset: %d || filho e: %d || filho d: %d", p_pag->chave[i], p_pag->offset[i],
-//					 p_pag->filhos[i], p_pag->filhos[i+1]);
-	} 
-//	printf("\nisbn: %s || offset: %d || filho e: %d || filho d: %d\n", p_pag->chave[i], p_pag->offset[i],
-//					 p_pag->filhos[i], p_pag->filhos[i+1]);
+    for(i = 0; i < p_pag->cont && (strcmp(chave,p_pag->chave[i])>0); i++);
     *pos = i; 
     if(*pos < p_pag->cont && (strcmp(chave,p_pag->chave[*pos])==0)){ 
     	return(SIM); 
@@ -595,7 +606,8 @@ void exibir_registro(int offset){
 //exibe os isbn de uma pagina 
 void exibir_pagina(BTpagina pagina){
 	for(int i = 0; i < pagina.cont; i++){
-		printf("\nIsbn: %s  || offset: %d", pagina.chave[i], pagina.offset[i]);
+		printf("\nIsbn: %s  || offset: %d || esq: %d || dir: %d || cont : %d", pagina.chave[i], pagina.offset[i] 
+																, pagina.filhos[i], pagina.filhos[i+1], pagina.cont);
 	}
 }
 
@@ -675,10 +687,10 @@ void consulta_casada(){
 		
 		
 		printf("\nValores maiores que: %s -> ", arq_consulta_casada[cont].isbn1);
-		pesquisa_maiores(raiz,arq_consulta_casada[cont].isbn1);
+		pesquisa_maiores(raiz, arq_consulta_casada[cont].isbn1);
 		
 		printf("\nValores menores que: %s -> ", arq_consulta_casada[cont].isbn2);
-		pesquisa_menores(raiz,arq_consulta_casada[cont].isbn2);
+		pesquisa_menores(raiz, arq_consulta_casada[cont].isbn2);
 		fclose(btfd);
 		
 		printf("\n Deseja fazer 1-match ou 2-merge?");
@@ -843,14 +855,281 @@ void match(){
 	fclose(arq);
 }
 
-
-/*int remover(char isbn[]){
-	 
+int remover(char isbn[], int raiz, int pos_pagina, int pos_registro, int offset){
+	BTpagina pagina, irmaE, irmaD, pai; 
+	int offset_sucessor, pos_pagina_sucessor, pos_registro_sucessor, pos_pag_pai, pos_reg_pai, pos_pag_irmaE, pos_pag_irmaD;
+	char sucessor[14];
 	
+	//pega a pagina do alvo
+	ler_arquivo(pos_pagina, &pagina);
+//	printf("\npagina atual:");
+//	printf("\nisbn: %s   ponteiro e: %d   ponteiro d: %d", pagina.chave[0], pagina.filhos[0], pagina.filhos[1]);
+//	getch();
 	
+	//Verifica se a pagina tem o minimo de elementos obrigatórios para a remoção
+	if(pagina.filhos[1] == NULO){	//verifica se a pagina é folha. obs: tem q ser o segundo... 
+		if((pagina.cont > MINCHAVES)){					//...filho para o tratamento da propagação funcionar
+			remover_caso1(pos_registro, pos_pagina, &pagina);
+			printf("\nIsbn %s removido, Caso 1", isbn);
+		}else{
+			achar_pag_irmas(pos_pagina, raiz, isbn, &pos_pag_pai, &pos_reg_pai, &pos_pag_irmaE, &pos_pag_irmaD);
+					
+			ler_arquivo(pos_pag_pai, &pai); //pega a pagina pai
+			ler_arquivo(pos_pag_irmaE, &irmaE); //pega a pagina irma esquerda
+			ler_arquivo(pos_pag_irmaD, &irmaD); //pega a pagina irma direita
+			
+			//verifica se ha irmao a esquerda e se ele pode dar elementos
+			if((pos_pag_irmaE != -1)  && (irmaE.cont > MINCHAVES)){ 
+				//efetua a redistribuição a direita			
+				redistribuicao(pos_reg_pai - 1, &pai, pos_pag_irmaE, &irmaE, &pagina, 0); //faz a redistribuição 
+				//escreve paginas atualizadas na arvore
+				escrever_arquivo(pos_pag_pai, &pai);
+				escrever_arquivo(pos_pag_irmaE, &irmaE);
+				escrever_arquivo(pos_pagina, &pagina);
+				
+//				printf("\nDepois reds.");
+//				printf("\nPAI");
+//				exibir_pagina(pai);
+//				printf("\nirma E");
+//				exibir_pagina(irmaE);
+//				printf("\nPagina");
+//				exibir_pagina(pagina);
+				
+				printf("\nIsbn %s removido com sucesso, redistribuicao d, caso 3", isbn);
+				getch();
+				return 1;
+			}
+			
+			//verifica se ha irmao a direita e se ele pode dar elementos
+			if((pos_pag_irmaD != -1) && (irmaD.cont > MINCHAVES)){  
+				//efetua a redistribuição a direita	
+				redistribuicao(pos_reg_pai, &pai, pos_pag_irmaD, &irmaD, &pagina, 1); //faz a redistribuição 
+				//escreve paginas atualizadas na arvore
+				escrever_arquivo(pos_pag_pai, &pai);
+////			escrever_arquivo(pos_pag_irmaD, &irmaD);
+				escrever_arquivo(pos_pagina, &pagina);
+				
+//				printf("\nDepois reds.");
+//				printf("\nPAI");
+//				exibir_pagina(pai);
+//				printf("\nirma D");
+//				exibir_pagina(irmaD);
+//				printf("\nPagina");
+//				exibir_pagina(pagina);
+				
+				printf("\nIsbn %s removido com sucesso, redistribuicao e, caso 3", isbn);
+				getch();
+				return 1;
+				
+			}
+			
+			//se nenhum dos irmãos pode emprestar chama a concatenação
+			concatenacao(pos_reg_pai, pos_pag_pai, &pai, pos_pag_irmaE, &irmaE, pos_pag_irmaD, &irmaD, pos_pagina, &pagina);
+//			printf("\nisbn pai: %s   ponteiro e: %d   ponteiro d: %d", pai.chave[0], pai.filhos[0], pai.filhos[1]);
+//			exibir_pagina(pagina);
+			printf("\nConcatenacao, caso 4");
+			getch();
+			
+			//verifica se propagou para cima
+			if(pai.cont == 0){
+				printf("\nPropagou para cima!!!");
+				if(pos_pag_pai == raiz){   //se o pai for a raiz da arvore é só reescrever a raiz
+					inserir_raiz(pai.filhos[0]);
+					printf("\nReescrevendo Raiz");
+					return 1;
+				}
+				remover(pai.chave[0], raiz, pos_pag_pai, 0, NULO);  //removendo o elemento do pai
+			}
+		}
+	}else{ //caso 2
+		//acha elemento que ira substituir o isbn alvo na arvore B
+		achar_sucessor_imediato(pagina.filhos[pos_registro], sucessor, &offset_sucessor, 
+									&pos_pagina_sucessor, &pos_registro_sucessor); 
+		substituir_elemento_caso2(pos_pagina, pos_registro, sucessor, offset_sucessor);
+		printf("\nIsbn %s alvo substituido por Isbn %s, caso 2", isbn, sucessor);
+		//removendo o sucessor de sua pagina antiga 
+		remover(sucessor, raiz, pos_pagina_sucessor, pos_registro_sucessor, offset_sucessor);
+		
+	}
+	return 1;
+}
+
+//remoção simples da arvore B
+void remover_caso1(int pos_registro, int pos_pagina, BTpagina *p_pag){
+	int j; 
+	for(j = pos_registro; j < (p_pag->cont - 1) ; j++){ 
+		strcpy(p_pag->chave[j],p_pag->chave[j+1]);
+		p_pag->offset[j] = p_pag->offset[j+1];
+	    p_pag->filhos[j] = p_pag->filhos[j+1];
+	} 
+	p_pag->filhos[j] = p_pag->filhos[j+1];
+	p_pag->cont--;
+	escrever_arquivo(pos_pagina, p_pag);  //escrevendo pagina atualizada na arvore
+}
+
+
+//acha o sucessor imediato a ESQUERDA do elemento removido
+int achar_sucessor_imediato(int rrn, char sucessor[], int *offset_sucessor, int *pos_pag_suc, int *pos_reg_suc){
+	BTpagina pagina;
 	
-}*/
+	ler_arquivo(rrn, &pagina); //le pagina atual
+	
+	if(pagina.filhos[pagina.cont] == NULO) {
+		//*sucessor = pagina.chave[pagina.cont - 1];
+		strcpy(sucessor, pagina.chave[pagina.cont - 1]);
+		*offset_sucessor = pagina.offset[pagina.cont - 1];
+		*pos_pag_suc = rrn;
+		*pos_reg_suc = pagina.cont - 1;
+		return 1;
+	};
 
+	achar_sucessor_imediato(pagina.filhos[pagina.cont], sucessor, offset_sucessor, pos_pag_suc, pos_reg_suc );
+	return 1;
+}
 
+//substituir chave alvo pelo sucessor imediato, caso 2
+void substituir_elemento_caso2(int pos_pagina, int pos_registro, char sucessor[], int offset_sucessor){
+	BTpagina pagina;
+	
+	ler_arquivo(pos_pagina, &pagina); //pegando pagina do sucessor
+	
+	strcpy(pagina.chave[pos_registro], sucessor); //trocando chave a ser removida pelo sucessor 
+	pagina.offset[pos_registro] = offset_sucessor; //trocando offset a ser removido pelo offset do sucessor
+	
+	escrever_arquivo(pos_pagina, &pagina);   //escrevendo pagina com novo elemento no arquivo
+}
 
+//acha as paginas irmãs da pagina do registro a ser removido
+int achar_pag_irmas(int pos_pagina, int raiz, char isbn[], int *pos_pag_pai, int *pos_reg_pai, 
+										int *pos_pag_irmaE, int *pos_pag_irmaD){
+	BTpagina pagina;
+	int j, pos;
+	
+	ler_arquivo(raiz, &pagina); //pega a raiz da arvore
+	
+	procurar_no(isbn, &pagina, &pos);
+	//verifica se alguem da pagina é pai do elemento a ser removido
+	// pos_pag_irmaE = pagina irmã a esquerda
+	// pos_pag_irmaD = pagina irmã a direita
+	if(pagina.filhos[pos] == pos_pagina){
+		*pos_pag_pai = raiz; 
+		*pos_reg_pai = pos;
+		if(pos == 0){		//se a pos = 0, só tem irmão a direita
+			*pos_pag_irmaE = NULO;
+			*pos_pag_irmaD = pagina.filhos[pos + 1];		
+		}else if(pos == pagina.cont){	//se a pos for igual a quantidade de elementos na pag só tem irmão a esquerda
+			*pos_pag_irmaE = pagina.filhos[pos - 1];
+			*pos_pag_irmaD = NULO;
+		}else{							//duas pag irmãs
+			*pos_pag_irmaE = pagina.filhos[pos - 1];
+			*pos_pag_irmaD = pagina.filhos[pos + 1];
+		}
+		return 1;
+	}
+	achar_pag_irmas(pos_pagina, pagina.filhos[pos], isbn, pos_pag_pai, pos_reg_pai, pos_pag_irmaE, pos_pag_irmaD);
+	return 0;
+}
 
+void redistribuicao(int pos_reg_pai, BTpagina *pai, int pos_pag_irmao, BTpagina *irmao, BTpagina *alvo, int tipo_redist){
+	int posicao_chave_irmao;
+	int j;
+	
+	//definindo a chave que sera passada do irmao
+	if(tipo_redist == 0){
+		posicao_chave_irmao = irmao->cont - 1; 
+	}else{
+		posicao_chave_irmao = 0;
+	}
+	
+	//relizando a redistribuicao
+	strcpy(alvo->chave[0], pai->chave[pos_reg_pai]);
+	strcpy(pai->chave[pos_reg_pai], irmao->chave[posicao_chave_irmao]);
+	
+	alvo->offset[0] = pai->offset[pos_reg_pai];
+	pai->offset[pos_reg_pai] = irmao->offset[posicao_chave_irmao];
+	
+	if(alvo->cont == 0) (alvo->cont)++;		//caso a redistribuição ocorra na propagação o cont do alvo vai estar zero
+											//sendo assim, incrementa o contador da pag do alvo			
+	if(tipo_redist == 0){
+		//arrumando os ponteiros, necessario para a restribuições de nós que não são folhas
+		alvo->filhos[1] = alvo->filhos[0];
+		alvo->filhos[0] = irmao->filhos[irmao->cont];
+		//retirando da pag irmã a chave que foi passada para o pai
+		(irmao->cont)--; 
+	}else{
+		//arrumando os ponteiros, necessario para a restribuições de nós que não são folhas
+		alvo->filhos[1] = irmao->filhos[0];
+		//retirando da pag irmã a chave que foi passada para o pai
+		remover_caso1(0, pos_pag_irmao, irmao);																			
+	}
+	
+}
+
+int concatenacao(int pos_reg_pai, int pos_pag_pai, BTpagina *pai, int pos_pag_irmaE, BTpagina *irmaE, 
+						int pos_pag_irmaD, BTpagina *irmaD, int pos_pag_alvo, BTpagina *pag_alvo){
+	//se pagina irma a esquerda for -1, a irma a direita será utilizada para fazer a
+	//concatenação, com a pagina do elemento a ser removido (pag_alvo) sendo a pagina que ira conter os registros
+	// e a irma a direita será  a pagina deletada, caso a irma esquerda não for -1 ela será utilizada para conter os 
+	//registros e a pagina alvo será eliminada.
+	if(pos_pag_irmaE == NULO){
+		//copiando primeiro e segundo elemento do irmao para a pagina em que está o elemento a ser removido
+		strcpy(pag_alvo->chave[0], pai->chave[0]);
+		pag_alvo->offset[0] = pai->offset[0];
+		
+		strcpy(pag_alvo->chave[1], irmaD->chave[0]);
+		pag_alvo->offset[1] = irmaD->offset[0];
+		
+		//pegando os filhos da pagina irma
+		pag_alvo->filhos[1] = irmaD->filhos[0];
+		pag_alvo->filhos[2] = irmaD->filhos[1];
+		//incrementando contador de elementos da pagina 
+		pag_alvo->cont = 2;
+		
+		//reorganizando pagina pai	
+		reorganiza_pai(pai, 0);
+		
+		inicializar_pagina(irmaD);
+		
+		//escrevendo paginas atualizadas na arvore
+		escrever_arquivo(pos_pag_pai, pai);
+		escrever_arquivo(pos_pag_alvo, pag_alvo);
+		escrever_arquivo(pos_pag_irmaD, irmaD);
+		
+	}else{
+		//inserindo na pagina irma a esquerda a chave do pai
+		strcpy(irmaE->chave[1], pai->chave[pos_reg_pai - 1]);
+		irmaE->offset[1] = pai->offset[pos_reg_pai - 1];
+		
+		//aponta para a pagina filha da pagina que será apagada
+		irmaE->filhos[2] = pag_alvo->filhos[0];
+		
+		//incremantando contador da pagina irma esquerda
+		irmaE->cont = 2;
+		
+		inicializar_pagina(pag_alvo);
+		
+		//reorganizando pagina pai
+		reorganiza_pai(pai, pos_reg_pai - 1);
+		
+		//escrevendo paginas atualizadas na arvore
+		escrever_arquivo(pos_pag_pai, pai);
+		escrever_arquivo(pos_pag_irmaE, irmaE);
+		escrever_arquivo(pos_pag_alvo, pag_alvo);
+	} 
+}
+
+//reorganiza pagina pai da concatenação
+void reorganiza_pai(BTpagina *pai, int pos_pai){
+	int i;
+	if(pai->cont != 1){
+		for(i = pos_pai; i < (pai->cont); i++){
+			strcpy(pai->chave[i], pai->chave[i+1]);
+			pai->offset[i] = pai->offset[i+1];
+			pai->filhos[i+1] = pai->filhos[i+2];
+		} 
+	}else{
+		pai->filhos[1] = NULO;
+	}
+	
+	(pai->cont)--;	
+}
