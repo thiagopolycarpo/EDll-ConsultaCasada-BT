@@ -1,3 +1,5 @@
+/* Desenvolvido por Bruno Domene e Thiago Polycarpo*/
+
 /*bibliotecas*/ 
 #include <stdio.h>
 #include <stdlib.h>
